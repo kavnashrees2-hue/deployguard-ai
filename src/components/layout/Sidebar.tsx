@@ -13,7 +13,9 @@ import {
   Database,
   Cpu,
   Layers,
-  Sparkles
+  Sparkles,
+  ShieldAlert,
+  Flame
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -63,6 +65,18 @@ export default function Sidebar({ storageType = 'Detecting...' }: SidebarProps) 
       label: 'Pipeline Visualizer',
       href: '/pipeline',
       icon: GitBranch
+    },
+    {
+      label: 'Risk Gatekeeper',
+      href: '/preflight',
+      icon: ShieldAlert,
+      tag: 'AI Gate'
+    },
+    {
+      label: 'Chaos Studio',
+      href: '/chaos',
+      icon: Flame,
+      tag: 'Resilience'
     }
   ];
 
@@ -123,6 +137,12 @@ export default function Sidebar({ storageType = 'Detecting...' }: SidebarProps) 
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center gap-0.5">
                       <Sparkles className="w-2.5 h-2.5" />
                       Rule Engine
+                    </span>
+                  )}
+
+                  {item.tag && !isActive && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                      {item.tag}
                     </span>
                   )}
                 </Link>

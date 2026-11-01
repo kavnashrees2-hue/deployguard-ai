@@ -124,3 +124,50 @@ export interface SampleLogPreset {
   description: string;
   logContent: string;
 }
+
+export interface PreFlightCheckRequest {
+  serviceName: string;
+  environment: Environment;
+  commitMessage: string;
+  author: string;
+  codeDiff?: string;
+  touchesDatabase?: boolean;
+  touchesResources?: boolean;
+  touchesNetwork?: boolean;
+  touchesDependencies?: boolean;
+}
+
+export interface PreFlightAssessment {
+  riskScore: number;
+  riskLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  decision: 'BLOCKED' | 'CAUTION' | 'APPROVED';
+  summary: string;
+  predictedFailureMode?: string;
+  failureProbability: number;
+  blastRadius: string[];
+  recommendations: string[];
+  checklist: { id: string; label: string; passed: boolean; tip?: string }[];
+  analyzedAt: string;
+}
+
+export interface ChaosNode {
+  id: string;
+  name: string;
+  type: 'GATEWAY' | 'SERVICE' | 'DATABASE' | 'CACHE' | 'INGRESS';
+  status: 'HEALTHY' | 'DEGRADED' | 'DOWN';
+  latencyMs: number;
+  errorRate: number;
+  activeReplicas: string;
+  details?: string;
+}
+
+export interface ChaosScenario {
+  id: string;
+  name: string;
+  targetService: string;
+  faultType: string;
+  description: string;
+  blastRadius: string[];
+  remediationTitle: string;
+  remediationCommand: string;
+}
