@@ -12,22 +12,33 @@ import {
   RefreshCw,
   Server,
   Terminal,
-  ShieldCheck
+  ShieldCheck,
+  ShieldAlert,
+  Flame,
+  Zap,
+  ArrowRight,
+  Database,
+  Dices,
+  Layers,
+  Activity
 } from 'lucide-react';
 import StatCard from '@/components/dashboard/StatCard';
 import FailureCategories from '@/components/dashboard/FailureCategories';
 import RecentDeployments from '@/components/dashboard/RecentDeployments';
 import DeploymentDetailModal from '@/components/deployments/DeploymentDetailModal';
 import { Deployment, SystemMetrics } from '@/lib/types';
+import { SAMPLE_PROFILES } from '@/lib/db/dynamicProfiles';
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDeployment, setSelectedDeployment] = useState<Deployment | null>(null);
+  const [activeProfile, setActiveProfile] = useState<string>('default');
+  const [seeding, setSeeding] = useState(false);
+  const [seedNotice, setSeedNotice] = useState<string | null>(null);
 
-  const handleRefresh = async () => {
-    setLoading(true);
+  const fetchDashboardData = async () => {
     try {
       const [metricsRes, depsRes] = await Promise.all([
         fetch('/api/metrics'),
@@ -41,8 +52,34 @@ export default function DashboardPage() {
       if (depsJson.success) setDeployments(depsJson.data);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    await fetchDashboardData();
+    setLoading(false);
+  };
+
+  const handleSwitchFleet = async (profileId: string) => {
+    setSeeding(true);
+    try {
+      const res = await fetch('/api/seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: profileId })
+      });
+      if (res.ok) {
+        setActiveProfile(profileId);
+        const name = SAMPLE_PROFILES.find((p) => p.id === profileId)?.name || profileId;
+        setSeedNotice(`Loaded dynamic dataset: ${name}`);
+        await fetchDashboardData();
+        setTimeout(() => setSeedNotice(null), 3500);
+      }
+    } catch (err) {
+      console.error('Fleet switch error:', err);
     } finally {
-      setLoading(false);
+      setSeeding(false);
     }
   };
 
@@ -78,7 +115,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-12">
       {/* Hero Welcome & Quick Presentation Banner */}
       <div className="p-6 lg:p-8 rounded-3xl bg-gradient-to-r from-indigo-950/60 via-slate-900/80 to-slate-950/90 border border-indigo-500/20 backdrop-blur-xl shadow-2xl relative overflow-hidden">
         <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -103,27 +140,50 @@ export default function DashboardPage() {
               Detect deployment failures across microservices, dissect Kubernetes & CI/CD error logs with a deterministic rule-based analysis engine, pinpoint probable root causes, and execute verified remediation runbooks.
             </p>
 
-            <div className="flex items-center gap-3 mt-5 flex-wrap">
+            {/* Quick Hero Nav Buttons */}
+            <div className="flex items-center gap-2.5 mt-5 flex-wrap">
+              <Link
+                href="/preflight"
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all border border-indigo-400/30"
+              >
+                <ShieldAlert className="w-4 h-4 text-white" />
+                <span>Risk Gatekeeper</span>
+                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-white/20 text-white uppercase">
+                  New
+                </span>
+              </Link>
+
+              <Link
+                href="/chaos"
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-rose-600/30 transition-all border border-rose-400/30"
+              >
+                <Flame className="w-4 h-4 text-white animate-pulse" />
+                <span>Chaos Studio</span>
+                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-white/20 text-white uppercase">
+                  New
+                </span>
+              </Link>
+
               <Link
                 href="/analyzer"
-                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all"
+                className="px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700/80 flex items-center gap-2 transition-all"
               >
-                <SearchCode className="w-4 h-4" />
-                <span>Launch Log Analyzer</span>
+                <SearchCode className="w-4 h-4 text-cyan-400" />
+                <span>Log Analyzer</span>
               </Link>
 
               <Link
                 href="/pipeline"
-                className="px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700/80 flex items-center gap-2 transition-all"
+                className="px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700/80 flex items-center gap-2 transition-all"
               >
-                <Terminal className="w-4 h-4 text-cyan-400" />
-                <span>Pipeline Visualizer</span>
+                <Terminal className="w-4 h-4 text-emerald-400" />
+                <span>Pipeline</span>
               </Link>
 
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition-all cursor-pointer"
+                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition-all cursor-pointer"
                 title="Refresh Live Data"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
@@ -155,6 +215,136 @@ export default function DashboardPage() {
               <span>Active Incidents: <strong className="text-amber-400">{metrics?.activeIncidents || 0}</strong></span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Standout Features Showcase Banner (New in DeployGuard) */}
+      <div className="p-6 rounded-2xl bg-[#0b101d] border border-indigo-500/30 relative overflow-hidden shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-indigo-400" />
+            <h2 className="text-base font-bold text-white tracking-tight">
+              Standout Features in DeployGuard AI
+            </h2>
+            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
+              Added Today
+            </span>
+          </div>
+          <span className="text-xs text-slate-400 hidden sm:inline">Explore the newest SRE & resilience tools</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Feature 1 Card: Pre-Flight AI Risk Gatekeeper */}
+          <div className="p-5 rounded-xl bg-slate-900/80 border border-indigo-500/30 hover:border-indigo-400/60 transition-all flex flex-col justify-between group">
+            <div>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="p-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-300">
+                  <ShieldAlert className="w-5 h-5 text-indigo-400" />
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                  Shift-Left SRE
+                </span>
+              </div>
+              <h3 className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors">
+                Pre-Deployment AI Risk Gatekeeper
+              </h3>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Evaluate PRs, git diffs, and schema migrations before rollout. Detects destructive DB locks, pod memory starvation, and hardcoded port bindings.
+              </p>
+              <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
+                <span className="text-emerald-400 font-mono">✓ 5 Architecture Checks</span>
+                <span>•</span>
+                <span className="text-cyan-400 font-mono">Blast Radius Mapping</span>
+              </div>
+            </div>
+
+            <div className="pt-4 mt-4 border-t border-slate-800/80 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Route: <code className="text-indigo-300 font-mono">/preflight</code></span>
+              <Link
+                href="/preflight"
+                className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition"
+              >
+                <span>Launch Gatekeeper</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Feature 2 Card: Chaos Engineering & Microservice Resilience */}
+          <div className="p-5 rounded-xl bg-slate-900/80 border border-rose-500/30 hover:border-rose-400/60 transition-all flex flex-col justify-between group">
+            <div>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="p-2.5 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-300">
+                  <Flame className="w-5 h-5 text-rose-400" />
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                  Live Sandbox
+                </span>
+              </div>
+              <h3 className="text-sm font-bold text-white group-hover:text-rose-300 transition-colors">
+                Chaos Engineering & Resilience Studio
+              </h3>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Inject real-world distributed faults into a 6-node production microservice mesh. Watch autonomous self-healing scale pods and recycle poisoned connections.
+              </p>
+              <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
+                <span className="text-rose-400 font-mono">⚡ 5 Injected Faults</span>
+                <span>•</span>
+                <span className="text-emerald-400 font-mono">Autonomous Self-Healing</span>
+              </div>
+            </div>
+
+            <div className="pt-4 mt-4 border-t border-slate-800/80 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Route: <code className="text-rose-300 font-mono">/chaos</code></span>
+              <Link
+                href="/chaos"
+                className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition"
+              >
+                <span>Open Chaos Studio</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Dynamic Sample Dataset Switcher Bar */}
+      <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+            <Database className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white">Dynamic Sample Fleet Switcher</span>
+              {seedNotice && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 animate-pulse">
+                  {seedNotice}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Click any profile to instantly populate DeployGuard with unique failure logs, microservices, and incident post-mortems:
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {SAMPLE_PROFILES.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => handleSwitchFleet(p.id)}
+              disabled={seeding}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 ${
+                activeProfile === p.id
+                  ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700/60'
+              }`}
+            >
+              {p.id === 'random' && <Dices className="w-3 h-3 text-amber-400" />}
+              <span>{p.name.split(' ')[0]}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -219,21 +409,26 @@ export default function DashboardPage() {
                 <strong>Rule Engine:</strong> Heuristic multi-line regex pattern matcher with dynamic confidence weighting. Evaluates Kubernetes, database, network, and dependency crash traces completely offline.
               </p>
               <p>
-                <strong>Database Sync:</strong> MongoDB persistence layer with instant zero-setup memory fallback for local execution.
+                <strong>Closed-Loop Auto-Remediation:</strong> Every failed deployment and incident features a live self-healing runner that applies dynamic patches and validates HTTP 200 health probes.
+              </p>
+              <p>
+                <strong>AI Pre-Flight Gatekeeper:</strong> Analyzes git diffs, schema locks, and resource allocations before code reaches production clusters.
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Deployment Modal Drawer */}
-      <DeploymentDetailModal
-        deployment={selectedDeployment}
-        onClose={() => setSelectedDeployment(null)}
-        onRollbackComplete={() => {
-          handleRefresh();
-        }}
-      />
+      {/* Detail Modal */}
+      {selectedDeployment && (
+        <DeploymentDetailModal
+          deployment={selectedDeployment}
+          onClose={() => setSelectedDeployment(null)}
+          onRollbackComplete={() => {
+            fetchDashboardData();
+          }}
+        />
+      )}
     </div>
   );
 }

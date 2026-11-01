@@ -70,13 +70,15 @@ export default function Sidebar({ storageType = 'Detecting...' }: SidebarProps) 
       label: 'Risk Gatekeeper',
       href: '/preflight',
       icon: ShieldAlert,
-      tag: 'AI Gate'
+      tag: 'NEW',
+      tagColor: 'indigo'
     },
     {
       label: 'Chaos Studio',
       href: '/chaos',
       icon: Flame,
-      tag: 'Resilience'
+      tag: 'NEW',
+      tagColor: 'rose'
     }
   ];
 
@@ -141,7 +143,11 @@ export default function Sidebar({ storageType = 'Detecting...' }: SidebarProps) 
                   )}
 
                   {item.tag && !isActive && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                    <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                      item.tagColor === 'rose'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
+                        : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+                    }`}>
                       {item.tag}
                     </span>
                   )}

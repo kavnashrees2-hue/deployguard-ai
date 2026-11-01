@@ -1,5 +1,6 @@
 import { Deployment, Incident, SystemMetrics, FailureCategory, Environment } from '../types';
 import { INITIAL_DEPLOYMENTS, INITIAL_INCIDENTS } from './initialData';
+import { getProfileData } from './dynamicProfiles';
 import clientPromise from './mongodb';
 
 // In-Memory store fallback
@@ -441,10 +442,11 @@ export class DataStore {
     };
   }
 
-  public static async resetToInitialData(): Promise<{ success: boolean; isMongo: boolean }> {
+  public static async resetToInitialData(profile: string = 'default'): Promise<{ success: boolean; isMongo: boolean; profile: string; count: number }> {
     const isMongo = await this.isMongoActive();
-    const pristineDeployments = JSON.parse(JSON.stringify(INITIAL_DEPLOYMENTS));
-    const pristineIncidents = JSON.parse(JSON.stringify(INITIAL_INCIDENTS));
+    const { deployments, incidents, profile: activeProfile } = getProfileData(profile);
+    const pristineDeployments = JSON.parse(JSON.stringify(deployments));
+    const pristineIncidents = JSON.parse(JSON.stringify(incidents));
 
     if (isMongo) {
       try {
@@ -463,6 +465,6 @@ export class DataStore {
     memoryStore.incidents = pristineIncidents;
     memoryStore.lastInitialized = new Date().toISOString();
 
-    return { success: true, isMongo };
+    return { success: true, isMongo, profile: activeProfile, count: pristineDeployments.length };
   }
 }

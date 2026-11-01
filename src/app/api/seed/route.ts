@@ -1,12 +1,37 @@
 import { NextResponse } from 'next/server';
 import { DataStore } from '@/lib/db/store';
+import { SAMPLE_PROFILES } from '@/lib/db/dynamicProfiles';
 
-export async function POST() {
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    profiles: SAMPLE_PROFILES
+  });
+}
+
+export async function POST(request: Request) {
   try {
-    const result = await DataStore.resetToInitialData();
+    let profile = 'default';
+    try {
+      const body = await request.json();
+      if (body && body.profile) {
+        profile = body.profile;
+      }
+    } catch {
+      // Body may be empty, default to 'default'
+    }
+
+    const result = await DataStore.resetToInitialData(profile);
+    const profileMeta = SAMPLE_PROFILES.find((p) => p.id === result.profile) || {
+      name: result.profile,
+      description: 'Custom profile dataset'
+    };
+
     return NextResponse.json({
       success: true,
-      message: 'Database reset and seeded with production sample data',
+      message: `Database seeded with profile: ${profileMeta.name}`,
+      profile: result.profile,
+      deploymentsCount: result.count,
       isMongo: result.isMongo
     });
   } catch (error) {
