@@ -16,7 +16,9 @@ import {
   ShieldAlert,
   Terminal,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Zap,
+  ShieldCheck
 } from 'lucide-react';
 import { Incident, IncidentStatus } from '@/lib/types';
 import { getIncidentStatusBadge, getSeverityBadge, getEnvironmentBadge, formatDate, formatTimeAgo } from '@/lib/utils';
@@ -42,6 +44,34 @@ function IncidentsContent() {
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolutionText, setResolutionText] = useState('');
   const [resolving, setResolving] = useState(false);
+  const [healingIncident, setHealingIncident] = useState(false);
+  const [healSuccessMsg, setHealSuccessMsg] = useState<string | null>(null);
+
+  const handleAutoHealIncident = async () => {
+    if (!activeIncident || healingIncident) return;
+    try {
+      setHealingIncident(true);
+      const res = await fetch('/api/remediate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incidentId: activeIncident.id,
+          serviceName: activeIncident.serviceName,
+          fixTitle: activeIncident.recommendedSolution || activeIncident.rootCause
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setHealSuccessMsg('Application healed & verified! Restored to production traffic (200 OK).');
+        setTimeout(() => setHealSuccessMsg(null), 5000);
+        await fetchIncidents();
+      }
+    } catch (err) {
+      console.error('Failed to auto-heal incident:', err);
+    } finally {
+      setHealingIncident(false);
+    }
+  };
 
   const fetchIncidents = async () => {
     try {
@@ -595,7 +625,18 @@ ${inc.postMortem?.actionItems ? inc.postMortem.actionItems.map((a) => `- [ ] ${a
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {activeIncident.status !== 'RESOLVED' && (
+                      <button
+                        onClick={handleAutoHealIncident}
+                        disabled={healingIncident}
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <Zap className={`w-3.5 h-3.5 fill-white ${healingIncident ? 'animate-bounce' : ''}`} />
+                        <span>{healingIncident ? 'Executing Runbook...' : '⚡ Auto-Heal Application'}</span>
+                      </button>
+                    )}
+
                     {activeIncident.remediationSteps && activeIncident.remediationSteps.length > 0 && (
                       <button
                         onClick={handleCopyAllCommands}
@@ -627,6 +668,13 @@ ${inc.postMortem?.actionItems ? inc.postMortem.actionItems.map((a) => `- [ ] ${a
                     )}
                   </div>
                 </div>
+
+                {healSuccessMsg && (
+                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 font-mono animate-in fade-in duration-200">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{healSuccessMsg}</span>
+                  </div>
+                )}
 
                 {/* Safety Warning */}
                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5 text-xs text-amber-200">

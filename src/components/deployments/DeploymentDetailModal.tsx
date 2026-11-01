@@ -15,7 +15,9 @@ import {
   Check, 
   Terminal, 
   CheckCircle2, 
-  AlertCircle
+  AlertCircle,
+  Zap,
+  ShieldCheck
 } from 'lucide-react';
 
 interface DeploymentDetailModalProps {
@@ -32,16 +34,42 @@ export default function DeploymentDetailModal({
   const [copied, setCopied] = useState(false);
   const [rollingBack, setRollingBack] = useState(false);
   const [rollbackSuccess, setRollbackSuccess] = useState<string | null>(null);
+  const [remediating, setRemediating] = useState(false);
+  const [remediateSuccess, setRemediateSuccess] = useState<string | null>(null);
 
   if (!deployment) return null;
 
-  const status = getStatusBadge(deployment.status);
+  const status = getStatusBadge(remediateSuccess ? 'SUCCESS' : deployment.status);
   const env = getEnvironmentBadge(deployment.environment);
 
   const handleCopyLogs = () => {
     navigator.clipboard.writeText(deployment.rawLogs);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAutoRemediate = async () => {
+    try {
+      setRemediating(true);
+      const res = await fetch('/api/remediate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deploymentId: deployment.id,
+          serviceName: deployment.serviceName,
+          fixTitle: deployment.failureReason || 'Dynamic Patch & Rollout Restart'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRemediateSuccess(`Application healed! Running healthy at HTTP 200 OK.`);
+        if (onRollbackComplete) onRollbackComplete();
+      }
+    } catch (err) {
+      console.error('Auto-remediate error:', err);
+    } finally {
+      setRemediating(false);
+    }
   };
 
   const handleRollback = async () => {
@@ -260,21 +288,40 @@ export default function DeploymentDetailModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
-          <span className="text-xs text-slate-400 font-mono">
-            Deployment ID: {deployment.id}
-          </span>
+        <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-mono">
+              Deployment ID: {deployment.id}
+            </span>
+            {remediateSuccess && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 font-mono">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                {remediateSuccess}
+              </span>
+            )}
+          </div>
 
-          <div className="flex items-center gap-3">
-            {deployment.status === 'FAILED' && !rollbackSuccess && (
-              <button
-                onClick={handleRollback}
-                disabled={rollingBack}
-                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-purple-600/20 disabled:opacity-50"
-              >
-                <RotateCcw className={`w-3.5 h-3.5 ${rollingBack ? 'animate-spin' : ''}`} />
-                <span>{rollingBack ? 'Triggering Rollback...' : 'Trigger Auto-Rollback'}</span>
-              </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {deployment.status === 'FAILED' && !rollbackSuccess && !remediateSuccess && (
+              <>
+                <button
+                  onClick={handleAutoRemediate}
+                  disabled={remediating || rollingBack}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                >
+                  <Zap className={`w-3.5 h-3.5 fill-white ${remediating ? 'animate-bounce' : ''}`} />
+                  <span>{remediating ? 'Healing Application...' : '⚡ Auto-Fix & Run Application'}</span>
+                </button>
+
+                <button
+                  onClick={handleRollback}
+                  disabled={rollingBack || remediating}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-purple-600/20 disabled:opacity-50"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${rollingBack ? 'animate-spin' : ''}`} />
+                  <span>{rollingBack ? 'Rolling back...' : 'Auto-Rollback'}</span>
+                </button>
+              </>
             )}
 
             <button

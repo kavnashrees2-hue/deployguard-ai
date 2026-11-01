@@ -81,4 +81,18 @@ describe('DataStore Tests (In-Memory Fallback & Metrics)', () => {
     expect(resolved?.status).toBe('RESOLVED');
     expect(resolved?.resolution).toContain('Scaled memory limit to 1.5Gi');
   });
+
+  it('should auto-remediate a failed deployment and heal it to SUCCESS', async () => {
+    const remediated = await DataStore.autoRemediateDeployment('dep-901', 'Scale Pod Memory Limits 512Mi -> 1.5Gi');
+    expect(remediated).toBeDefined();
+    expect(remediated?.deployment.status).toBe('SUCCESS');
+    expect(remediated?.deployment.stages.every((s) => s.status === 'PASSED')).toBe(true);
+    expect(remediated?.deployment.rawLogs).toContain('[DEPLOYGUARD AUTO-HEAL INITIATED');
+  });
+
+  it('should auto-remediate an incident and resolve it', async () => {
+    const res = await DataStore.autoRemediateIncident('INC-001', 'Cleared database migration lock');
+    expect(res).toBeDefined();
+    expect(res?.incident.status).toBe('RESOLVED');
+  });
 });
