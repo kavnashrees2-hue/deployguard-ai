@@ -41,6 +41,15 @@ export const SAMPLE_PROFILES: SampleProfileMeta[] = [
   }
 ];
 
+export const PROFILES_CYCLE: string[] = ['default', 'fintech_outage', 'multicloud_cascade', 'ai_cluster', 'random'];
+
+let currentCycleIndex = 0;
+
+export function getNextProfile(): string {
+  currentCycleIndex = (currentCycleIndex + 1) % PROFILES_CYCLE.length;
+  return PROFILES_CYCLE[currentCycleIndex];
+}
+
 export const FINTECH_DEPLOYMENTS: Deployment[] = [
   {
     id: 'dep-ft-101',

@@ -76,7 +76,7 @@ function IncidentsContent() {
   const fetchIncidents = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/incidents');
+      const res = await fetch(`/api/incidents?t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
       if (data.success) {
         setIncidents(data.data);
@@ -100,37 +100,14 @@ function IncidentsContent() {
   };
 
   useEffect(() => {
-    let ignore = false;
-    async function load() {
-      try {
-        const res = await fetch('/api/incidents');
-        const data = await res.json();
-        if (!ignore && data.success) {
-          setIncidents(data.data);
-          setActiveIncident((prev) => {
-            if (targetId) {
-              const targeted = data.data.find((i: Incident) => i.id.toLowerCase() === targetId.toLowerCase());
-              if (targeted) return targeted;
-            }
-            if (prev) {
-              const updated = data.data.find((i: Incident) => i.id === prev.id);
-              return updated || (data.data.length > 0 ? data.data[0] : null);
-            }
-            return data.data.length > 0 ? data.data[0] : null;
-          });
-        }
-      } catch (err) {
-        console.error('Failed to load incidents:', err);
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
-      }
-    }
+    fetchIncidents();
 
-    load();
+    const onSeed = () => {
+      fetchIncidents();
+    };
+    window.addEventListener('deployguard:seed', onSeed);
     return () => {
-      ignore = true;
+      window.removeEventListener('deployguard:seed', onSeed);
     };
   }, [targetId]);
 

@@ -30,8 +30,9 @@ export default function DeploymentsPage() {
       const params = new URLSearchParams();
       if (selectedEnv !== 'all') params.append('environment', selectedEnv);
       if (selectedStatus !== 'all') params.append('status', selectedStatus);
+      params.append('t', Date.now().toString());
 
-      const res = await fetch(`/api/deployments?${params.toString()}`);
+      const res = await fetch(`/api/deployments?${params.toString()}`, { cache: 'no-store' });
       const data = await res.json();
       if (data.success) {
         setDeployments(data.data);
@@ -44,30 +45,14 @@ export default function DeploymentsPage() {
   };
 
   useEffect(() => {
-    let ignore = false;
-    async function load() {
-      try {
-        const params = new URLSearchParams();
-        if (selectedEnv !== 'all') params.append('environment', selectedEnv);
-        if (selectedStatus !== 'all') params.append('status', selectedStatus);
+    fetchDeployments();
 
-        const res = await fetch(`/api/deployments?${params.toString()}`);
-        const data = await res.json();
-        if (!ignore && data.success) {
-          setDeployments(data.data);
-        }
-      } catch (err) {
-        console.error('Failed to load deployments:', err);
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
+    const onSeed = () => {
+      fetchDeployments();
+    };
+    window.addEventListener('deployguard:seed', onSeed);
     return () => {
-      ignore = true;
+      window.removeEventListener('deployguard:seed', onSeed);
     };
   }, [selectedEnv, selectedStatus]);
 

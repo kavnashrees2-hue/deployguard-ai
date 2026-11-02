@@ -11,10 +11,19 @@ export async function GET(request: NextRequest) {
 
     const incidents = await DataStore.getIncidents({ status, severity, search });
 
-    return NextResponse.json({
-      success: true,
-      data: incidents
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: incidents
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0'
+        }
+      }
+    );
   } catch (error) {
     console.error('Error fetching incidents:', error);
     return NextResponse.json(

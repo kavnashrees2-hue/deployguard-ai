@@ -20,7 +20,8 @@ import {
   Database,
   Dices,
   Layers,
-  Activity
+  Activity,
+  RotateCcw
 } from 'lucide-react';
 import StatCard from '@/components/dashboard/StatCard';
 import FailureCategories from '@/components/dashboard/FailureCategories';
@@ -40,9 +41,10 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     try {
+      const ts = Date.now();
       const [metricsRes, depsRes] = await Promise.all([
-        fetch('/api/metrics'),
-        fetch('/api/deployments')
+        fetch(`/api/metrics?t=${ts}`, { cache: 'no-store' }),
+        fetch(`/api/deployments?t=${ts}`, { cache: 'no-store' })
       ]);
 
       const metricsJson = await metricsRes.json();
@@ -67,12 +69,17 @@ export default function DashboardPage() {
       const res = await fetch('/api/seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile: profileId })
+        body: JSON.stringify({ 
+          profile: profileId === 'default' ? 'default' : profileId,
+          action: profileId === 'default' ? 'reset' : undefined
+        })
       });
       if (res.ok) {
-        setActiveProfile(profileId);
-        const name = SAMPLE_PROFILES.find((p) => p.id === profileId)?.name || profileId;
-        setSeedNotice(`Loaded dynamic dataset: ${name}`);
+        const data = await res.json();
+        const effectiveProfile = data.profile || profileId;
+        setActiveProfile(effectiveProfile);
+        const name = data.profileName || SAMPLE_PROFILES.find((p) => p.id === effectiveProfile)?.name || effectiveProfile;
+        setSeedNotice(`Loaded: ${name}`);
         await fetchDashboardData();
         setTimeout(() => setSeedNotice(null), 3500);
       }
@@ -84,33 +91,18 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    let ignore = false;
-    async function init() {
-      try {
-        const [metricsRes, depsRes] = await Promise.all([
-          fetch('/api/metrics'),
-          fetch('/api/deployments')
-        ]);
+    fetchDashboardData().then(() => setLoading(false));
 
-        const metricsJson = await metricsRes.json();
-        const depsJson = await depsRes.json();
-
-        if (!ignore) {
-          if (metricsJson.success) setMetrics(metricsJson.data);
-          if (depsJson.success) setDeployments(depsJson.data);
-        }
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
+    const onSeedEvent = (e: any) => {
+      if (e.detail?.profile) {
+        setActiveProfile(e.detail.profile);
       }
-    }
+      fetchDashboardData();
+    };
 
-    init();
+    window.addEventListener('deployguard:seed', onSeedEvent);
     return () => {
-      ignore = true;
+      window.removeEventListener('deployguard:seed', onSeedEvent);
     };
   }, []);
 
@@ -309,42 +301,70 @@ export default function DashboardPage() {
       </div>
 
       {/* Dynamic Sample Dataset Switcher Bar */}
-      <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900/90 via-[#0d1424] to-slate-900/90 border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+          <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
             <Database className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-white">Dynamic Sample Fleet Switcher</span>
-              {seedNotice && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 animate-pulse">
+              <span className="text-xs font-bold text-white">Dynamic Sample Fleet Controller</span>
+              {seedNotice ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 animate-pulse">
                   {seedNotice}
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono text-slate-400">
+                  Current: <strong className="text-indigo-300">{SAMPLE_PROFILES.find((p) => p.id === activeProfile)?.name || activeProfile}</strong>
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400">
-              Click any profile to instantly populate DeployGuard with unique failure logs, microservices, and incident post-mortems:
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Generate different microservice failure scenarios dynamically or reset to baseline with one click:
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {SAMPLE_PROFILES.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => handleSwitchFleet(p.id)}
-              disabled={seeding}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 ${
-                activeProfile === p.id
-                  ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700/60'
-              }`}
-            >
-              {p.id === 'random' && <Dices className="w-3 h-3 text-amber-400" />}
-              <span>{p.name.split(' ')[0]}</span>
-            </button>
-          ))}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Change / Next Sample Button */}
+          <button
+            onClick={() => handleSwitchFleet('next')}
+            disabled={seeding}
+            className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Cycle to next dynamic failure fleet"
+          >
+            <Dices className={`w-3.5 h-3.5 ${seeding ? 'animate-spin' : ''}`} />
+            <span>{seeding ? 'Switching...' : 'Change Sample Fleet'}</span>
+          </button>
+
+          {/* Reset Baseline Button */}
+          <button
+            onClick={() => handleSwitchFleet('default')}
+            disabled={seeding}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Reset database to initial baseline sample"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 text-slate-400 ${seeding ? 'animate-spin' : ''}`} />
+            <span>Reset Baseline</span>
+          </button>
+
+          {/* Preset Chips */}
+          <div className="hidden xl:flex items-center gap-1 pl-2 border-l border-slate-800">
+            {SAMPLE_PROFILES.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => handleSwitchFleet(p.id)}
+                disabled={seeding}
+                className={`px-2 py-1 rounded text-[11px] font-medium transition cursor-pointer ${
+                  activeProfile === p.id
+                    ? 'bg-indigo-600 text-white font-bold'
+                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80 border border-slate-700/50'
+                }`}
+              >
+                {p.name.split(' ')[0]}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

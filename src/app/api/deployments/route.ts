@@ -17,11 +17,20 @@ export async function GET(request: NextRequest) {
 
     const isMongo = await DataStore.isMongoActive();
 
-    return NextResponse.json({
-      success: true,
-      data: deployments,
-      storage: isMongo ? 'MongoDB' : 'In-Memory Store (Zero Setup)'
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: deployments,
+        storage: isMongo ? 'MongoDB' : 'In-Memory Store (Zero Setup)'
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0'
+        }
+      }
+    );
   } catch (error) {
     console.error('Error fetching deployments:', error);
     return NextResponse.json(
